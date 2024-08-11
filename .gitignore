@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+venv/
+stampy_text_html.json
+entries/
+.idea
