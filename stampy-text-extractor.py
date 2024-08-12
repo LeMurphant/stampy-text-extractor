@@ -1,4 +1,4 @@
-#!/usr/bin/python3.12
+#!/usr/bin/python3.10
 import json
 import os
 import shutil
@@ -11,29 +11,14 @@ import argparse
 import re
 import sys
 from typing import List
-
-
-class MLStripper(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.reset()
-        self.strict = False
-        self.convert_charrefs = True
-        self.text = []
-
-    def handle_data(self, d):
-        self.text.append(d)
-
-    def get_data(self):
-        return ''.join(self.text)
+from bs4 import BeautifulSoup
 
 
 def strip_tags(html_text):
     if html_text is None:
         return ""
-    s = MLStripper()
-    s.feed(html_text)
-    return s.get_data()
+    soup = BeautifulSoup(html_text, 'html.parser')
+    return soup.get_text()
 
 
 @dataclass
@@ -53,14 +38,15 @@ class Entry:
     order: int
 
 
-def download_json(local_file: str, refresh: bool, status: str, password: str) -> dict:
+def download_json(local_file: str, status: str, password: str) -> dict:
+    """Download the JSON file from aisafety.info"""
     url = 'https://aisafety.info/questions/allQuestions'
     if not password:
         password = os.environ.get('STAMPY_PASSWORD')
     if not password:
         print("Error: Please provide the password or set it in the STAMPY_PASSWORD environment variable.")
         sys.exit(1)
-    auth = HTTPBasicAuth('stampy', password)
+    auth = HTTPBasicAuth('stampy', password)  # the authentication is known to be weak
     params = {'dataType': 'singleFileJson', 'questions': status}
 
     response = requests.get(url, auth=auth, params=params)
@@ -72,6 +58,12 @@ def download_json(local_file: str, refresh: bool, status: str, password: str) ->
 
 
 def parse_json_data(content: List[dict]) -> List[Entry]:
+    """
+    Convert the JSON data into a list of entries (articles).
+    Only articles with relevant statuses are kept.
+    """
+    excluded_statuses = {"Marked for deletion", "Subsection", "Duplicate"}
+
     entries = []
     for item in content:
         try:
@@ -91,7 +83,9 @@ def parse_json_data(content: List[dict]) -> List[Entry]:
                     'updatedAt') else datetime.min,
                 order=item.get('order', 0)
             )
-            entries.append(entry)
+            if entry.status not in excluded_statuses:
+                entries.append(entry)
+
         except KeyError as e:
             print(f"Skipping entry due to missing key: {e}")
         except ValueError as e:
@@ -104,24 +98,22 @@ def sanitize_filename(filename):
     # Remove or replace characters that are invalid in filenames
     sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
     # Limit the length of the filename
-    return sanitized[:200]  # Adjust this number as needed
+    return sanitized[:200]  # we had some really long filenames
 
 
 def dump_entries(entries: List[Entry]):
+    """Extract entries into individual text files"""
     if os.path.exists('entries'):
         shutil.rmtree('entries')
 
     # Recreate the 'entries' directory
     os.makedirs('entries')
 
-    excluded_statuses = {"Marked for deletion", "Subsection", "Duplicate"}
+
 
     nb_entries = 0
 
     for entry in entries:
-        if entry.status in excluded_statuses:
-            continue  # we are not interested in these statuses
-
         safe_title = sanitize_filename(entry.title)
         filename = f"entries/({entry.status})_{safe_title}.txt"
         try:
@@ -183,7 +175,7 @@ def main():
 
     local_file = 'stampy_text_html.json'
     if args.refresh or not os.path.exists(local_file):
-        json_data = download_json(local_file, args.refresh, args.status, args.password)
+        json_data = download_json(local_file, args.status, args.password)
     else:
         with open(local_file, 'r') as file:
             json_data = json.load(file)
