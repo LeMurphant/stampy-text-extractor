@@ -4,7 +4,6 @@ import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
-from html.parser import HTMLParser
 import requests
 from requests.auth import HTTPBasicAuth
 import argparse
@@ -12,6 +11,7 @@ import re
 import sys
 from typing import List
 from bs4 import BeautifulSoup
+from pathvalidate import sanitize_filename
 
 
 def strip_tags(html_text):
@@ -21,7 +21,7 @@ def strip_tags(html_text):
     return soup.get_text()
 
 
-@dataclass
+@dataclass(frozen=True)
 class Entry:
     title: str
     pageid: str
@@ -70,7 +70,7 @@ def parse_json_data(content: List[dict]) -> List[Entry]:
             entry = Entry(
                 title=item.get('title', ''),
                 pageid=item.get('pageid', ''),
-                text=strip_tags(item.get('text', '')),  # Remove HTML tags
+                text=strip_tags(item.get('text', '')),
                 answerEditLink=item.get('answerEditLink', ''),
                 tags=item.get('tags', []),
                 banners=item.get('banners', []),
@@ -79,42 +79,36 @@ def parse_json_data(content: List[dict]) -> List[Entry]:
                 alternatePhrasings=item.get('alternatePhrasings', ''),
                 subtitle=item.get('subtitle', ''),
                 parents=item.get('parents', []),
-                updatedAt=datetime.fromisoformat(item.get('updatedAt', '').rstrip('Z')) if item.get(
-                    'updatedAt') else datetime.min,
+                updatedAt=parse_datetime(item.get('updatedAt', '')),
                 order=item.get('order', 0)
             )
             if entry.status not in excluded_statuses:
                 entries.append(entry)
 
-        except KeyError as e:
-            print(f"Skipping entry due to missing key: {e}")
         except ValueError as e:
             print(f"Error parsing entry: {e}")
 
     return entries
 
 
-def sanitize_filename(filename):
-    # Remove or replace characters that are invalid in filenames
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
-    # Limit the length of the filename
-    return sanitized[:200]  # we had some really long filenames
+def parse_datetime(date_string: str) -> datetime:
+    if not date_string:
+        return datetime.min
+    return datetime.fromisoformat(date_string.rstrip('Z'))
 
 
 def dump_entries(entries: List[Entry]):
     """Extract entries into individual text files"""
+
+    # remove all files in the "entries" folder
     if os.path.exists('entries'):
         shutil.rmtree('entries')
-
-    # Recreate the 'entries' directory
     os.makedirs('entries')
-
-
 
     nb_entries = 0
 
     for entry in entries:
-        safe_title = sanitize_filename(entry.title)
+        safe_title = sanitize_filename(entry.title, platform='auto')
         filename = f"entries/({entry.status})_{safe_title}.txt"
         try:
             with open(filename, 'w', encoding='utf-8') as file:
