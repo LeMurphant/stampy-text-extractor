@@ -9,7 +9,6 @@ from requests.auth import HTTPBasicAuth
 import argparse
 import re
 import sys
-from typing import List
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 from typing import List, Union
@@ -160,20 +159,27 @@ def search_entries(entries, search_term, case_sensitive=False, whole_word=False)
     for entry in entries:
         title_match = re.search(pattern, entry.title, flags=flags)
         text_match = re.search(pattern, entry.text, flags=flags)
+        url_matches = [re.search(pattern, url, flags=flags) for url in entry.URLs]
 
-        if title_match or text_match:
-            results.append({
+        if title_match or text_match or any(url_matches):
+            result = {
                 'title': entry.title,
                 'status': entry.status,
                 'matches': []
-            })
+            }
 
             if title_match:
-                results[-1]['matches'].append(('title', title_match.start(), title_match.group()))
+                result['matches'].append(('title', title_match.start(), title_match.group()))
 
             for line_num, line in enumerate(entry.text.split('\n'), 1):
                 for match in re.finditer(pattern, line, flags=flags):
-                    results[-1]['matches'].append(('text', match.group(), line.strip()))
+                    result['matches'].append(('text', match.group(), line.strip()))
+
+            for url, url_match in zip(entry.URLs, url_matches):
+                if url_match:
+                    result['matches'].append(('url', url_match.group(), url))
+
+            results.append(result)
 
     return results
 
