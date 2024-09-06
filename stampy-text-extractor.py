@@ -12,6 +12,7 @@ import sys
 from typing import List
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
+from typing import List, Union
 
 
 def strip_tags(html_text):
@@ -36,6 +37,7 @@ class Entry:
     parents: List[str]
     updatedAt: datetime
     order: int
+    URLs: str
 
 
 def download_json(local_file: str, status: str, password: str) -> dict:
@@ -67,10 +69,12 @@ def parse_json_data(content: List[dict]) -> List[Entry]:
     entries = []
     for item in content:
         try:
+            rawtext = item.get('text', '')
+            urls = extract_urls(rawtext)
             entry = Entry(
                 title=item.get('title', ''),
                 pageid=item.get('pageid', ''),
-                text=strip_tags(item.get('text', '')),
+                text=strip_tags(rawtext),
                 answerEditLink=item.get('answerEditLink', ''),
                 tags=item.get('tags', []),
                 banners=item.get('banners', []),
@@ -80,7 +84,8 @@ def parse_json_data(content: List[dict]) -> List[Entry]:
                 subtitle=item.get('subtitle', ''),
                 parents=item.get('parents', []),
                 updatedAt=parse_datetime(item.get('updatedAt', '')),
-                order=item.get('order', 0)
+                order=item.get('order', 0),
+                URLs=urls
             )
             if entry.status not in excluded_statuses:
                 entries.append(entry)
@@ -89,6 +94,21 @@ def parse_json_data(content: List[dict]) -> List[Entry]:
             print(f"Error parsing entry: {e}")
 
     return entries
+
+
+def extract_urls(text: Union[str, None]) -> List[str]:
+    if text is None:
+        return []
+
+    if not isinstance(text, str):
+        try:
+            text = str(text)
+        except Exception as e:
+            print(f"Error converting text to string: {e}")
+            return []
+
+    url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+    return url_pattern.findall(text)
 
 
 def parse_datetime(date_string: str) -> datetime:
@@ -113,6 +133,10 @@ def dump_entries(entries: List[Entry]):
         try:
             with open(filename, 'w', encoding='utf-8') as file:
                 file.write(f"Title: {entry.title}\n\n")
+                file.write("URLs:\n")
+                for url in entry.URLs:
+                    file.write(f"- {url}\n")
+                file.write("\n")
                 file.write(entry.text)
             nb_entries += 1
         except OSError as e:
