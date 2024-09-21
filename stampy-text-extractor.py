@@ -106,8 +106,14 @@ def extract_urls(text: Union[str, None]) -> List[str]:
             print(f"Error converting text to string: {e}")
             return []
 
+    # http URLs
     url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
-    return url_pattern.findall(text)
+    # internal URLs
+    state_url_pattern = re.compile(r'\/\?state=[A-Za-z0-9]{4}&amp;question=[^"]+')
+
+    standard_urls = url_pattern.findall(text)
+    state_urls = state_url_pattern.findall(text)
+    return standard_urls + state_urls
 
 
 def parse_datetime(date_string: str) -> datetime:
