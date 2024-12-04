@@ -129,6 +129,17 @@ def parse_datetime(date_string: str) -> datetime:
     return datetime.fromisoformat(date_string.rstrip('Z'))
 
 
+def clean_filename(text: str) -> str:
+    """Convert text to a clean filename by removing special characters and replacing spaces with underscores"""
+    # Remove any non-alphanumeric characters (except spaces)
+    cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    # Replace multiple spaces with single space and trim
+    cleaned = ' '.join(cleaned.split())
+    # Replace spaces with underscores
+    cleaned = cleaned.replace(' ', '_')
+    return cleaned
+
+
 def dump_entries(entries: List[Entry]):
     """Extract entries into individual text files"""
 
@@ -140,8 +151,9 @@ def dump_entries(entries: List[Entry]):
     nb_entries = 0
 
     for entry in entries:
-        safe_title = sanitize_filename(entry.title, platform='auto')
-        filename = f"entries/({entry.status})_{safe_title}.txt"
+        clean_title = clean_filename(entry.title)
+        clean_status = clean_filename(entry.status)
+        filename = f"entries/{clean_status}_{clean_title}.txt"
         try:
             with open(filename, 'w', encoding='utf-8') as file:
                 file.write(f"Title: {entry.title}\n\n")
