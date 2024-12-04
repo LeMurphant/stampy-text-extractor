@@ -58,7 +58,7 @@ def download_json(local_file: str, status: str, password: str) -> dict:
     return data
 
 
-def parse_json_data(content: List[dict]) -> List[Entry]:
+def parse_json_data(content: List[dict], text_only: bool = False) -> List[Entry]:
     """
     Convert the JSON data into a list of entries (articles).
     Only articles with relevant statuses are kept.
@@ -69,11 +69,18 @@ def parse_json_data(content: List[dict]) -> List[Entry]:
     for item in content:
         try:
             rawtext = item.get('text', '')
-            urls = extract_urls(rawtext)
+            urls = [] if text_only else extract_urls(rawtext)
+            cleaned_text = strip_tags(rawtext)
+
+            if text_only:
+                # Remove lines ending with ↩︎, they are footnotes
+                cleaned_text = '\n'.join(line for line in cleaned_text.split('\n') if not line.strip().endswith('↩︎'))
+                cleaned_text = re.sub(r'\s*\n\s*\n\s*\n+', '\n\n', cleaned_text)  # Clean up extra newlines
+
             entry = Entry(
                 title=item.get('title', ''),
                 pageid=item.get('pageid', ''),
-                text=strip_tags(rawtext),
+                text=cleaned_text,
                 answerEditLink=item.get('answerEditLink', ''),
                 tags=item.get('tags', []),
                 banners=item.get('banners', []),
@@ -197,6 +204,7 @@ def main():
     parser.add_argument('--status', choices=['live', 'inProgress', 'all'], default='all',
                         help='Select which status of questions to include (default: all)')
     parser.add_argument('--password', required=False, help='Password for authentication', default='')
+    parser.add_argument('--text-only', action='store_true', help='Discards URLs and footnotes')
 
     parser.add_argument('--search', help='Search for a specific term in titles and text')
     parser.add_argument('--case-sensitive', action='store_true', help='Make the search case-sensitive')
@@ -210,7 +218,7 @@ def main():
         with open(local_file, 'r') as file:
             json_data = json.load(file)
 
-    entries = parse_json_data(json_data)
+    entries = parse_json_data(json_data, args.text_only)
 
     if args.search:
         search_results = search_entries(entries, args.search, args.case_sensitive, args.whole_word)
