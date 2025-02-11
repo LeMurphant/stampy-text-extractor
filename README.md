@@ -1,11 +1,13 @@
 # stampy-text-extractor
 
-A script to download all text from aisafety.info. Also includes a search tool.
+A tool to download all text from aisafety.info. Also includes a search tool that supports regular expressions.
+
+To get the password to the database, you can ask on [Rob Miles' Discord](https://discord.gg/4jFYvn5D)
 
 Set the password in your environment variable.
 
-export STAMPY_PASSWORD='thepassword'
+`export STAMPY_PASSWORD='thepassword'`
 
-If you don't know the password, go ask on Discord
+Usage: 
 
-Usage: stampy-text-extractor.py --help
+`stampy-text-extractor.py --help`
