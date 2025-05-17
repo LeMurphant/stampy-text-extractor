@@ -129,6 +129,29 @@ def parse_datetime(date_string: str) -> datetime:
     return datetime.fromisoformat(date_string.rstrip('Z'))
 
 
+def extract_google_doc_id(url: str) -> str:
+    """
+    Extract the Google Doc ID from a URL.
+    Returns the original URL if it's not a Google Doc URL or if the pattern doesn't match.
+    """
+    if not url:
+        return ""
+    
+    # Match Google Doc URL pattern
+    gdoc_pattern = r'docs\.google\.com/document/d/([a-zA-Z0-9_-]+)'
+    match = re.search(gdoc_pattern, url)
+    if match:
+        return match.group(1)
+    
+    # Match aisafety.info state pattern 
+    state_pattern = r'state=([a-zA-Z0-9_]+)'
+    match = re.search(state_pattern, url)
+    if match:
+        return match.group(1)
+        
+    return url
+
+
 def clean_filename(text: str) -> str:
     """Convert text to a clean filename by removing special characters and replacing spaces with underscores"""
     # Remove any non-alphanumeric characters (except spaces)
@@ -190,6 +213,7 @@ def search_entries(entries, search_term, case_sensitive=False, whole_word=False)
             result = {
                 'title': entry.title,
                 'status': entry.status,
+                'doc_id': extract_google_doc_id(entry.answerEditLink),
                 'matches': []
             }
 
@@ -239,6 +263,7 @@ def main():
                 print()
                 print(f"Title: {result['title']}")
                 print(f"Status: {result['status']}")
+                print(f"Doc ID: {result['doc_id']}")
                 for match in result['matches']:
                     if match[0] == 'title':
                         pass
